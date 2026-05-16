@@ -6,7 +6,7 @@ import type { Building, Project } from '@/lib/types'
 
 export default function BuildingsPage() {
   const [buildings, setBuildings] = useState<Building[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<Pick<Project, 'id' | 'name'>[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', project_id: '', floors: '' })
