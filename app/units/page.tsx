@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Unit } from '@/lib/types'
+import type { Unit, Building } from '@/lib/types'
 
 const STATUS_STYLES: Record<string, string> = {
   occupied: 'bg-green-100 text-green-700',
@@ -12,15 +12,20 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function UnitsPage() {
   const [units, setUnits] = useState<Unit[]>([])
+  const [buildings, setBuildings] = useState<Pick<Building, 'id' | 'name'>[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ unit_number: '', floor: '', tower: 'Tower A', bedrooms: '1', bathrooms: '1', area_sqm: '', status: 'occupied' })
+  const [form, setForm] = useState({ unit_number: '', floor: '', building_id: '', bedrooms: '1', bathrooms: '1', area_sqm: '', status: 'occupied' })
   const [saving, setSaving] = useState(false)
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase.from('units').select('*').order('unit_number')
-    setUnits(data ?? [])
+    const [u, b] = await Promise.all([
+      supabase.from('units').select('*, buildings(name)').order('unit_number'),
+      supabase.from('buildings').select('id, name').order('name'),
+    ])
+    setUnits(u.data ?? [])
+    setBuildings(b.data ?? [])
     setLoading(false)
   }
 
@@ -32,7 +37,7 @@ export default function UnitsPage() {
     await supabase.from('units').insert({
       unit_number: form.unit_number,
       floor: parseInt(form.floor),
-      tower: form.tower,
+      building_id: form.building_id || null,
       bedrooms: parseInt(form.bedrooms),
       bathrooms: parseInt(form.bathrooms),
       area_sqm: form.area_sqm ? parseFloat(form.area_sqm) : null,
@@ -40,7 +45,7 @@ export default function UnitsPage() {
     })
     setSaving(false)
     setShowModal(false)
-    setForm({ unit_number: '', floor: '', tower: 'Tower A', bedrooms: '1', bathrooms: '1', area_sqm: '', status: 'occupied' })
+    setForm({ unit_number: '', floor: '', building_id: '', bedrooms: '1', bathrooms: '1', area_sqm: '', status: 'occupied' })
     load()
   }
 
@@ -62,12 +67,18 @@ export default function UnitsPage() {
         </button>
       </div>
 
+      {buildings.length === 0 && !loading && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 mb-6">
+          You need to add a Building first before adding units.
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-border shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-slate text-xs uppercase tracking-wide border-b border-border">
               <th className="px-6 py-3 text-left">Unit</th>
-              <th className="px-6 py-3 text-left">Tower</th>
+              <th className="px-6 py-3 text-left">Building</th>
               <th className="px-6 py-3 text-left">Floor</th>
               <th className="px-6 py-3 text-left">Beds / Baths</th>
               <th className="px-6 py-3 text-left">Area</th>
@@ -76,13 +87,11 @@ export default function UnitsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-slate">Loading...</td></tr>
-            )}
+            {loading && <tr><td colSpan={7} className="px-6 py-8 text-center text-slate">Loading...</td></tr>}
             {!loading && units.map(u => (
               <tr key={u.id} className="border-b border-border last:border-0 hover:bg-cream/50">
                 <td className="px-6 py-3 font-semibold">{u.unit_number}</td>
-                <td className="px-6 py-3">{u.tower}</td>
+                <td className="px-6 py-3">{(u as any).buildings?.name ?? '—'}</td>
                 <td className="px-6 py-3">{u.floor}</td>
                 <td className="px-6 py-3">{u.bedrooms}BR / {u.bathrooms}BA</td>
                 <td className="px-6 py-3">{u.area_sqm ? `${u.area_sqm} m²` : '—'}</td>
@@ -96,9 +105,7 @@ export default function UnitsPage() {
                 </td>
               </tr>
             ))}
-            {!loading && units.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-slate">No units yet</td></tr>
-            )}
+            {!loading && units.length === 0 && <tr><td colSpan={7} className="px-6 py-8 text-center text-slate">No units yet</td></tr>}
           </tbody>
         </table>
       </div>
@@ -108,13 +115,12 @@ export default function UnitsPage() {
           <div className="bg-white rounded-2xl p-6 w-96 shadow-xl">
             <h2 className="font-bold text-lg text-ink mb-4">Add Unit</h2>
             <form onSubmit={handleAdd} className="space-y-3">
+              <select required value={form.building_id} onChange={e => setForm(f => ({...f, building_id: e.target.value}))} className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest">
+                <option value="">Select Building</option>
+                {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
               <input required placeholder="Unit Number (e.g. 12B)" value={form.unit_number} onChange={e => setForm(f => ({...f, unit_number: e.target.value}))} className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest" />
-              <div className="grid grid-cols-2 gap-3">
-                <input required type="number" placeholder="Floor" value={form.floor} onChange={e => setForm(f => ({...f, floor: e.target.value}))} className="border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest" />
-                <select value={form.tower} onChange={e => setForm(f => ({...f, tower: e.target.value}))} className="border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest">
-                  <option>Tower A</option><option>Tower B</option><option>Tower C</option>
-                </select>
-              </div>
+              <input required type="number" placeholder="Floor" value={form.floor} onChange={e => setForm(f => ({...f, floor: e.target.value}))} className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest" />
               <div className="grid grid-cols-2 gap-3">
                 <input required type="number" placeholder="Bedrooms" value={form.bedrooms} onChange={e => setForm(f => ({...f, bedrooms: e.target.value}))} className="border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest" />
                 <input required type="number" placeholder="Bathrooms" value={form.bathrooms} onChange={e => setForm(f => ({...f, bathrooms: e.target.value}))} className="border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest" />

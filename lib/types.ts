@@ -1,3 +1,20 @@
+export interface Project {
+  id: string
+  name: string
+  location: string | null
+  description: string | null
+  created_at: string
+}
+
+export interface Building {
+  id: string
+  project_id: string | null
+  name: string
+  floors: number | null
+  created_at: string
+  projects?: Project
+}
+
 export type UnitStatus = 'occupied' | 'vacant' | 'reserved'
 export type TicketStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 export type Priority = 'low' | 'medium' | 'high'
@@ -8,12 +25,14 @@ export interface Unit {
   id: string
   unit_number: string
   floor: number
-  tower: string
+  tower: string | null
+  building_id: string | null
   bedrooms: number
   bathrooms: number
   area_sqm: number | null
   status: UnitStatus
   created_at: string
+  buildings?: Building
 }
 
 export interface Resident {
