@@ -6,7 +6,7 @@ import type { Resident, Unit } from '@/lib/types'
 
 export default function ResidentsPage() {
   const [residents, setResidents] = useState<Resident[]>([])
-  const [units, setUnits] = useState<Unit[]>([])
+  const [units, setUnits] = useState<Pick<Unit, 'id' | 'unit_number'>[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', unit_id: '', role: 'owner', move_in_date: '' })
