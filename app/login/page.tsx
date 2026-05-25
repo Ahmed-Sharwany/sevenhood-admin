@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const router  = useRouter()
-  const [step, setStep]       = useState<'email' | 'sent'>('email')
+  const router = useRouter()
+  const [step, setStep]       = useState<'email' | 'otp'>('email')
   const [email, setEmail]     = useState('')
+  const [otp, setOtp]         = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [countdown, setCountdown] = useState(0)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Redirect away if already logged in
   useEffect(() => {
@@ -26,9 +28,9 @@ export default function LoginPage() {
     return () => clearTimeout(t)
   }, [countdown])
 
-  // ── Step 1: Send Magic Link ───────────────────────────────────────────────
+  // ── Step 1: Send OTP ──────────────────────────────────────────────────────
 
-  async function handleSendLink(e: React.FormEvent) {
+  async function handleSendOTP(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
@@ -53,14 +55,9 @@ export default function LoginPage() {
       return
     }
 
-    const callbackUrl = `${window.location.origin}/auth/callback`
-
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: cleanEmail,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: callbackUrl,
-      },
+      options: { shouldCreateUser: true },
     })
 
     if (otpError) {
@@ -69,23 +66,95 @@ export default function LoginPage() {
       return
     }
 
-    setStep('sent')
+    setStep('otp')
     setCountdown(60)
     setLoading(false)
+    setTimeout(() => inputRefs.current[0]?.focus(), 50)
+  }
+
+  // ── Step 2: Verify OTP ────────────────────────────────────────────────────
+
+  async function handleVerifyOTP(e: React.FormEvent) {
+    e.preventDefault()
+    const code = otp.join('')
+    if (code.length !== 6) {
+      setError('Please enter the complete 6-digit code.')
+      return
+    }
+    setError('')
+    setLoading(true)
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: email.toLowerCase().trim(),
+      token: code,
+      type: 'email',
+    })
+
+    if (verifyError) {
+      setError('Invalid or expired code. Please try again.')
+      setOtp(['', '', '', '', '', ''])
+      setTimeout(() => inputRefs.current[0]?.focus(), 50)
+      setLoading(false)
+      return
+    }
+
+    // Fetch full account record and store locally
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('id, full_name, email, role, company_name')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle()
+
+    if (account) {
+      localStorage.setItem('sevenhood_user', JSON.stringify(account))
+    }
+
+    // Set session cookie so middleware can detect login
+    document.cookie = 'sb_logged_in=1; path=/; max-age=86400; SameSite=Strict'
+
+    router.replace('/')
+  }
+
+  // ── OTP input helpers ─────────────────────────────────────────────────────
+
+  function handleOtpInput(index: number, value: string) {
+    if (!/^\d*$/.test(value)) return
+    const newOtp = [...otp]
+    newOtp[index] = value.slice(-1)
+    setOtp(newOtp)
+    setError('')
+    if (value && index < 5) inputRefs.current[index + 1]?.focus()
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+    if (e.key === 'ArrowLeft'  && index > 0) inputRefs.current[index - 1]?.focus()
+    if (e.key === 'ArrowRight' && index < 5) inputRefs.current[index + 1]?.focus()
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    e.preventDefault()
+    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!paste) return
+    const newOtp = Array.from({ length: 6 }, (_, i) => paste[i] ?? '')
+    setOtp(newOtp)
+    inputRefs.current[Math.min(paste.length - 1, 5)]?.focus()
   }
 
   async function handleResend() {
     if (countdown > 0) return
-    setLoading(true)
+    setOtp(['', '', '', '', '', ''])
     setError('')
-    const callbackUrl = `${window.location.origin}/auth/callback`
-    const { error: otpError } = await supabase.auth.signInWithOtp({
+    setLoading(true)
+    await supabase.auth.signInWithOtp({
       email: email.toLowerCase().trim(),
-      options: { shouldCreateUser: true, emailRedirectTo: callbackUrl },
+      options: { shouldCreateUser: true },
     })
-    if (otpError) setError(otpError.message)
     setCountdown(60)
     setLoading(false)
+    setTimeout(() => inputRefs.current[0]?.focus(), 50)
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -97,11 +166,9 @@ export default function LoginPage() {
 
       {/* ── Left panel ──────────────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-2/5 bg-forest flex-col justify-between p-12 relative overflow-hidden">
-        {/* Decorative circles */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-gold/10 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
-        {/* Logo */}
         <div className="relative">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gold rounded-xl flex items-center justify-center text-white font-bold text-lg">▦</div>
@@ -112,7 +179,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Feature list */}
         <div className="relative space-y-5">
           <p className="text-white/60 text-sm mb-6">Everything you need to manage premium residential communities.</p>
           {[
@@ -123,9 +189,7 @@ export default function LoginPage() {
             { icon: '✨', title: 'AI Interior Design',      desc: 'Resident design requests, powered by AI' },
           ].map(f => (
             <div key={f.title} className="flex items-start gap-3.5">
-              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-base shrink-0">
-                {f.icon}
-              </div>
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-base shrink-0">{f.icon}</div>
               <div>
                 <div className="text-white text-sm font-semibold">{f.title}</div>
                 <div className="text-white/40 text-xs mt-0.5">{f.desc}</div>
@@ -134,7 +198,6 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* Footer */}
         <div className="relative">
           <div className="text-white/50 text-2xl font-light" dir="rtl">سابع جار</div>
           <div className="text-white/20 text-xs mt-1.5">Sevenhood v2.0 · KSA PropTech Platform</div>
@@ -145,7 +208,6 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
 
-          {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 mb-8">
             <div className="w-8 h-8 bg-forest rounded-lg flex items-center justify-center text-white font-bold text-sm">▦</div>
             <span className="font-bold text-ink">Sevenhood</span>
@@ -157,13 +219,13 @@ export default function LoginPage() {
               <div className="mb-8">
                 <h1 className="text-2xl font-bold text-ink">Welcome back</h1>
                 <p className="text-slate text-sm mt-2">
-                  Enter your operator email to receive a secure login link.
+                  Enter your operator email to receive a 6-digit login code.
                 </p>
               </div>
 
               {error && <ErrorBanner message={error} />}
 
-              <form onSubmit={handleSendLink} className="space-y-5">
+              <form onSubmit={handleSendOTP} className="space-y-5">
                 <div>
                   <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">
                     Email Address
@@ -185,10 +247,7 @@ export default function LoginPage() {
                   disabled={loading || !email.trim()}
                   className="w-full bg-forest text-white rounded-xl py-3 text-sm font-semibold hover:bg-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {loading
-                    ? <><Spinner />Sending link...</>
-                    : 'Send Login Link →'
-                  }
+                  {loading ? <><Spinner />Sending code...</> : 'Send Login Code →'}
                 </button>
               </form>
 
@@ -199,65 +258,80 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* ── Link sent step ─────────────────────────────────────────── */}
-          {step === 'sent' && (
+          {/* ── OTP step ───────────────────────────────────────────────── */}
+          {step === 'otp' && (
             <>
               <button
-                onClick={() => { setStep('email'); setError('') }}
+                onClick={() => { setStep('email'); setOtp(['', '', '', '', '', '']); setError('') }}
                 className="flex items-center gap-1.5 text-slate text-sm mb-7 hover:text-ink transition-colors"
               >
                 ← Back
               </button>
 
-              <div className="text-center py-4">
-                {/* Animated envelope */}
-                <div className="w-20 h-20 bg-forest/10 rounded-3xl flex items-center justify-center text-4xl mb-6 mx-auto">
-                  📧
-                </div>
-
-                <h1 className="text-2xl font-bold text-ink mb-3">Check your email</h1>
-                <p className="text-slate text-sm mb-1">
-                  We sent a login link to
+              <div className="mb-8">
+                <div className="w-14 h-14 bg-forest/10 rounded-2xl flex items-center justify-center text-2xl mb-5">📧</div>
+                <h1 className="text-2xl font-bold text-ink">Check your email</h1>
+                <p className="text-slate text-sm mt-2">
+                  We sent a 6-digit code to{' '}
+                  <span className="font-semibold text-ink">{email}</span>
                 </p>
-                <p className="font-semibold text-ink text-sm mb-6">{email}</p>
-
-                {/* Steps */}
-                <div className="bg-forest/5 rounded-2xl p-5 text-left space-y-3 mb-6">
-                  {[
-                    { n: '1', text: 'Open the email from Sevenhood' },
-                    { n: '2', text: 'Click the "Log In" link inside' },
-                    { n: '3', text: "You'll be signed in automatically" },
-                  ].map(s => (
-                    <div key={s.n} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-forest text-white text-xs font-bold flex items-center justify-center shrink-0">
-                        {s.n}
-                      </div>
-                      <span className="text-sm text-ink">{s.text}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-xs text-fog mb-4">
-                  The link expires in 1 hour. Check your spam folder if you don&apos;t see it.
-                </p>
-
-                {error && <ErrorBanner message={error} />}
-
-                {countdown > 0 ? (
-                  <p className="text-xs text-fog">
-                    Resend available in{' '}
-                    <span className="font-semibold text-slate tabular-nums">{countdown}s</span>
-                  </p>
-                ) : (
-                  <button
-                    onClick={handleResend}
-                    disabled={loading}
-                    className="text-sm text-forest hover:text-deep font-semibold underline underline-offset-2 disabled:opacity-50"
-                  >
-                    {loading ? 'Sending...' : 'Resend login link'}
-                  </button>
-                )}
+                <p className="text-fog text-xs mt-1">Didn&apos;t get it? Check your spam folder.</p>
               </div>
+
+              {error && <ErrorBanner message={error} />}
+
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-semibold text-slate mb-3 uppercase tracking-wide">
+                    6-Digit Login Code
+                  </label>
+                  <div className="flex gap-2.5 justify-between" onPaste={handleOtpPaste}>
+                    {otp.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={el => { inputRefs.current[i] = el }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={e => handleOtpInput(i, e.target.value)}
+                        onKeyDown={e => handleOtpKeyDown(i, e)}
+                        className={`w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 focus:outline-none transition-all ${
+                          digit
+                            ? 'border-forest bg-forest/5 text-forest'
+                            : 'border-border text-ink focus:border-forest'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || otp.some(d => d === '')}
+                  className="w-full bg-forest text-white rounded-xl py-3 text-sm font-semibold hover:bg-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? <><Spinner />Verifying...</> : 'Verify & Sign In →'}
+                </button>
+
+                <div className="text-center pt-1">
+                  {countdown > 0 ? (
+                    <p className="text-xs text-fog">
+                      Resend code in{' '}
+                      <span className="font-semibold text-slate tabular-nums">{countdown}s</span>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={loading}
+                      className="text-xs text-forest hover:text-deep font-semibold underline underline-offset-2 disabled:opacity-50"
+                    >
+                      Resend login code
+                    </button>
+                  )}
+                </div>
+              </form>
             </>
           )}
         </div>
@@ -265,8 +339,6 @@ export default function LoginPage() {
     </div>
   )
 }
-
-// ── Small helper components ────────────────────────────────────────────────
 
 function ErrorBanner({ message }: { message: string }) {
   return (
