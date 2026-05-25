@@ -33,6 +33,8 @@ const EMPTY_FORM = {
   full_name: '',
   email: '',
   phone: '',
+  modal_project_id: '',
+  modal_building_id: '',
   unit_id: '',
   role: 'tenant' as 'owner' | 'tenant' | 'family',
   move_in_date: '',
@@ -92,10 +94,16 @@ export default function ResidentsPage() {
 
   function openEdit(r: ResidentRow) {
     setEditingResident(r)
+    // Pre-fill cascade: find building + project from the unit
+    const unit = units.find(u => u.id === r.unit_id)
+    const bldId = unit?.building_id ?? ''
+    const bld   = buildings.find(b => b.id === bldId)
     setForm({
       full_name: r.full_name,
       email: r.email ?? '',
       phone: r.phone ?? '',
+      modal_project_id: bld?.project_id ?? '',
+      modal_building_id: bldId,
       unit_id: r.unit_id ?? '',
       role: r.role,
       move_in_date: r.move_in_date ?? '',
@@ -341,17 +349,44 @@ export default function ResidentsPage() {
                   className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest"
                 />
               </div>
+              {/* Cascade: Project → Building → Unit */}
               <div>
-                <label className="text-xs text-slate mb-1 block">Unit</label>
+                <label className="text-xs font-semibold text-slate mb-1 block uppercase tracking-wide">Project</label>
+                <select
+                  value={form.modal_project_id}
+                  onChange={e => setForm(f => ({ ...f, modal_project_id: e.target.value, modal_building_id: '', unit_id: '' }))}
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest bg-white"
+                >
+                  <option value="">Select project…</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate mb-1 block uppercase tracking-wide">Building</label>
+                <select
+                  value={form.modal_building_id}
+                  disabled={!form.modal_project_id}
+                  onChange={e => setForm(f => ({ ...f, modal_building_id: e.target.value, unit_id: '' }))}
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest bg-white disabled:opacity-50"
+                >
+                  <option value="">Select building…</option>
+                  {buildings
+                    .filter(b => b.project_id === form.modal_project_id)
+                    .map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate mb-1 block uppercase tracking-wide">Unit</label>
                 <select
                   value={form.unit_id}
+                  disabled={!form.modal_building_id}
                   onChange={e => setForm(f => ({ ...f, unit_id: e.target.value }))}
-                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest"
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest bg-white disabled:opacity-50"
                 >
-                  <option value="">No unit assigned</option>
-                  {unitOptions.map(u => (
-                    <option key={u.id} value={u.id}>{u.label}</option>
-                  ))}
+                  <option value="">Select unit…</option>
+                  {units
+                    .filter(u => u.building_id === form.modal_building_id)
+                    .map(u => <option key={u.id} value={u.id}>{u.unit_number}</option>)}
                 </select>
               </div>
               <div>

@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import type { Project, City, ProjectStatus } from '@/lib/types'
+import ImageUpload from '@/components/ImageUpload'
+
+const MapPicker = dynamic(() => import('@/components/MapPicker'), { ssr: false })
 
 const AMENITY_OPTIONS = [
   'Pool', 'Gym', 'Parking', 'Security', 'Concierge',
@@ -24,6 +28,8 @@ interface FormState {
   contract_end: string
   monthly_fee: string
   status: ProjectStatus
+  lat: number | null
+  lng: number | null
 }
 
 const EMPTY_FORM: FormState = {
@@ -39,6 +45,8 @@ const EMPTY_FORM: FormState = {
   contract_end: '',
   monthly_fee: '',
   status: 'active',
+  lat: null,
+  lng: null,
 }
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
@@ -141,6 +149,8 @@ export default function ProjectsPage() {
       contract_end: p.contract_end ?? '',
       monthly_fee: p.monthly_fee?.toString() ?? '',
       status: p.status,
+      lat: (p as any).lat ?? null,
+      lng: (p as any).lng ?? null,
     })
     setShowModal(true)
   }
@@ -170,6 +180,8 @@ export default function ProjectsPage() {
       contract_end: form.contract_end || null,
       monthly_fee: form.monthly_fee ? parseFloat(form.monthly_fee) : 0,
       status: form.status,
+      lat: form.lat,
+      lng: form.lng,
     }
     if (editingProject) {
       await supabase.from('projects').update(payload).eq('id', editingProject.id)
@@ -443,6 +455,16 @@ export default function ProjectsPage() {
                 />
               </div>
 
+              {/* Map */}
+              <div>
+                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">Pin on Map</label>
+                <MapPicker
+                  lat={form.lat}
+                  lng={form.lng}
+                  onChange={(lat, lng) => setForm(f => ({ ...f, lat, lng }))}
+                />
+              </div>
+
               {/* Description */}
               <div>
                 <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">Description</label>
@@ -476,14 +498,13 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              {/* Image URL */}
+              {/* Image Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">Image URL</label>
-                <input
-                  placeholder="https://…"
+                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">Project Image</label>
+                <ImageUpload
                   value={form.image_url}
-                  onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-                  className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest"
+                  onChange={url => setForm(f => ({ ...f, image_url: url }))}
+                  folder="projects"
                 />
               </div>
 

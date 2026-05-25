@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Building, Project, City } from '@/lib/types'
+import ImageUpload from '@/components/ImageUpload'
 
 const EMPTY_FORM = {
   project_id: '',
@@ -313,13 +314,11 @@ export default function BuildingsPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-slate mb-1 block">Image URL</label>
-                <input
-                  type="text"
-                  placeholder="https://..."
+                <label className="text-xs text-slate mb-1 block uppercase tracking-wide font-semibold">Building Image</label>
+                <ImageUpload
                   value={form.image_url}
-                  onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest"
+                  onChange={url => setForm(f => ({ ...f, image_url: url }))}
+                  folder="buildings"
                 />
               </div>
               <div className="flex gap-3 pt-2">
