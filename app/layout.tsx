@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import Sidebar from '@/components/Sidebar'
+import AuthInit from '@/components/AuthInit'
+import LayoutWrapper from '@/components/LayoutWrapper'
 
 export const metadata: Metadata = {
   title: 'Sevenhood Admin',
@@ -10,9 +11,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen bg-cream">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">{children}</main>
+      <body className="bg-cream">
+        <AuthInit />
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   )

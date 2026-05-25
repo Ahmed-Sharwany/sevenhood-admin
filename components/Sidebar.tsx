@@ -1,7 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+interface StoredUser {
+  id: string
+  full_name: string
+  email: string
+  role: string
+  company_name: string | null
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  super_admin:      'Super Admin',
+  project_owner:    'Project Owner',
+  service_provider: 'Service Provider',
+}
 
 const NAV_GROUPS = [
   {
@@ -45,7 +61,29 @@ const NAV_GROUPS = [
 ]
 
 export default function Sidebar() {
-  const path = usePathname()
+  const path    = usePathname()
+  const router  = useRouter()
+  const [user, setUser] = useState<StoredUser | null>(null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('sevenhood_user')
+    if (stored) {
+      try { setUser(JSON.parse(stored)) } catch { /* ignore */ }
+    }
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    localStorage.removeItem('sevenhood_user')
+    document.cookie = 'sb_logged_in=; path=/; max-age=0; SameSite=Strict'
+    router.replace('/login')
+  }
+
+  // Initials from full name
+  function initials(name: string) {
+    return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
+  }
+
   return (
     <aside className="w-60 min-h-screen bg-forest text-white flex flex-col shrink-0">
       {/* Logo */}
@@ -82,8 +120,31 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-6 py-4 border-t border-white/10 text-xs text-white/30">
-        Sevenhood v2.0 · سابع جار
+      {/* User info + logout */}
+      <div className="px-4 py-4 border-t border-white/10">
+        {user && (
+          <div className="flex items-center gap-3 mb-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {initials(user.full_name)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-white text-xs font-semibold truncate">{user.full_name}</div>
+              <div className="text-white/40 text-xs truncate">
+                {ROLE_LABEL[user.role] ?? user.role}
+              </div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-white/40 hover:text-white hover:bg-white/8 text-xs font-medium transition-colors"
+        >
+          <span className="text-sm">↪</span>
+          Sign out
+        </button>
+        <div className="px-3 pt-2 text-white/20 text-xs">
+          Sevenhood v2.0 · سابع جار
+        </div>
       </div>
     </aside>
   )
