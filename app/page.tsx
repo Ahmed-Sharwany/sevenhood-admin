@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
 async function getStats() {
