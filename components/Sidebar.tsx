@@ -17,11 +17,13 @@ const NAV_GROUPS = [
       { href: '/buildings', label: 'Buildings',     icon: '🏢' },
       { href: '/units',     label: 'Units',         icon: '🚪' },
       { href: '/residents', label: 'Residents',     icon: '👤' },
+      { href: '/amenities', label: 'Amenities',     icon: '🏊' },
     ]
   },
   {
     label: 'Operations',
     items: [
+      { href: '/bookings',  label: 'Bookings',       icon: '📅' },
       { href: '/tickets',   label: 'Maint. Tickets', icon: '🔧' },
       { href: '/providers', label: 'Service Providers', icon: '⚙️' },
       { href: '/visitors',  label: 'Visitors',      icon: '🔑' },
