@@ -87,9 +87,22 @@ export default function Sidebar() {
   return (
     <aside className="w-60 min-h-screen bg-forest text-white flex flex-col shrink-0">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/10">
-        <div className="text-2xl font-bold tracking-wide">Sevenhood</div>
-        <div className="text-xs text-white/40 tracking-widest mt-0.5">OPERATOR CONSOLE</div>
+      <div className="px-5 py-5 border-b border-white/10">
+        <div className="flex items-center gap-2.5">
+          {/* S-mark */}
+          <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ color: '#C9A56B' }}>
+            <mask id="sidebar-mark" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+              <rect x="4" y="4" width="56" height="56" rx="15" fill="white" />
+              <path d="M 46 22 C 14 22 14 32 32 32 C 50 32 50 42 18 42"
+                stroke="black" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </mask>
+            <rect x="4" y="4" width="56" height="56" rx="15" fill="currentColor" mask="url(#sidebar-mark)" />
+          </svg>
+          <div>
+            <div className="text-[15px] font-semibold tracking-[-0.02em] text-white leading-none">Sevenhood</div>
+            <div className="text-[10px] text-white/35 tracking-[.12em] mt-[3px] uppercase" style={{ fontFamily: 'Geist Mono, monospace' }}>Operator Console</div>
+          </div>
+        </div>
       </div>
 
       {/* Nav */}
@@ -142,8 +155,8 @@ export default function Sidebar() {
           <span className="text-sm">↪</span>
           Sign out
         </button>
-        <div className="px-3 pt-2 text-white/20 text-xs">
-          Sevenhood v2.0 · سابع جار
+        <div className="px-3 pt-2 text-white/20 text-[11px]" style={{ fontFamily: 'Geist Mono, monospace', letterSpacing: '.04em' }}>
+          Sevenhood v2.0
         </div>
       </div>
     </aside>

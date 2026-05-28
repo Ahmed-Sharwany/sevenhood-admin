@@ -14,31 +14,20 @@ export default function AppleIcon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0D2818',
+          background: '#0B0C0A',
           borderRadius: 40,
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            width: 148,
-            height: 148,
-            borderRadius: 30,
-            border: '2px solid rgba(200, 124, 42, 0.3)',
-            display: 'flex',
-          }}
-        />
         <span
           style={{
-            color: '#C87C2A',
+            color: '#C9A56B',
             fontSize: 108,
-            fontWeight: 900,
+            fontWeight: 600,
             fontFamily: 'serif',
             lineHeight: 1,
-            marginTop: 6,
           }}
         >
-          7
+          S
         </span>
       </div>
     ),

@@ -14,31 +14,20 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0D2818',
-          borderRadius: 7,
+          background: '#0B0C0A',
+          borderRadius: 8,
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            width: 26,
-            height: 26,
-            borderRadius: 5,
-            border: '1px solid rgba(200, 124, 42, 0.3)',
-            display: 'flex',
-          }}
-        />
         <span
           style={{
-            color: '#C87C2A',
-            fontSize: 19,
-            fontWeight: 900,
+            color: '#C9A56B',
+            fontSize: 18,
+            fontWeight: 600,
             fontFamily: 'serif',
             lineHeight: 1,
-            marginTop: 1,
           }}
         >
-          7
+          S
         </span>
       </div>
     ),
