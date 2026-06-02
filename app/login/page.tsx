@@ -37,31 +37,24 @@ export default function LoginPage() {
 
     const cleanEmail = email.toLowerCase().trim()
 
-    // Check if email is registered as an operator account
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id, is_active')
-      .eq('email', cleanEmail)
-      .maybeSingle()
+    try {
+      // Server-side route: validates account exists (using service role, no RLS issues)
+      // then sends OTP via Supabase auth
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      })
 
-    if (!account) {
-      setError('This email is not registered as an operator account. Contact your administrator.')
-      setLoading(false)
-      return
-    }
-    if (!account.is_active) {
-      setError('This account has been deactivated. Contact your administrator.')
-      setLoading(false)
-      return
-    }
+      const data = await res.json()
 
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: cleanEmail,
-      options: { shouldCreateUser: true },
-    })
-
-    if (otpError) {
-      setError(otpError.message)
+      if (!res.ok || data.error) {
+        setError(data.error ?? 'Failed to send login code. Please try again.')
+        setLoading(false)
+        return
+      }
+    } catch {
+      setError('Network error. Please try again.')
       setLoading(false)
       return
     }
@@ -84,35 +77,56 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      email: email.toLowerCase().trim(),
-      token: code,
-      type: 'email',
-    })
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: email.toLowerCase().trim(),
+        token: code,
+        type: 'email',
+      })
 
-    if (verifyError) {
-      setError('Invalid or expired code. Please try again.')
-      setOtp(['', '', '', '', '', ''])
-      setTimeout(() => inputRefs.current[0]?.focus(), 50)
-      setLoading(false)
-      return
-    }
+      if (verifyError) {
+        setError('Invalid or expired code. Please try again.')
+        setOtp(['', '', '', '', '', ''])
+        setTimeout(() => inputRefs.current[0]?.focus(), 50)
+        setLoading(false)
+        return
+      }
 
-    // Fetch full account record and store locally
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id, full_name, email, role, company_name')
-      .eq('email', email.toLowerCase().trim())
-      .maybeSingle()
+      // Now authenticated — look up account record (RLS allows this now)
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('id, full_name, email, role, company_name, is_active, permissions, project_access')
+        .eq('email', email.toLowerCase().trim())
+        .maybeSingle()
 
-    if (account) {
+      if (!account) {
+        // Valid Supabase auth user but no platform account — reject access
+        await supabase.auth.signOut()
+        setError('This email is not registered on the platform. Contact your administrator.')
+        setOtp(['', '', '', '', '', ''])
+        setTimeout(() => inputRefs.current[0]?.focus(), 50)
+        setLoading(false)
+        return
+      }
+
+      if (!account.is_active) {
+        await supabase.auth.signOut()
+        setError('This account has been deactivated. Contact your administrator.')
+        setOtp(['', '', '', '', '', ''])
+        setLoading(false)
+        return
+      }
+
+      // Store account locally and set session cookie
       localStorage.setItem('sevenhood_user', JSON.stringify(account))
+      document.cookie = 'sb_logged_in=1; path=/; max-age=86400; SameSite=Strict'
+
+      router.replace('/')
+    } catch (err) {
+      console.error('[login] verifyOtp error:', err)
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
     }
-
-    // Set session cookie so middleware can detect login
-    document.cookie = 'sb_logged_in=1; path=/; max-age=86400; SameSite=Strict'
-
-    router.replace('/')
   }
 
   // ── OTP input helpers ─────────────────────────────────────────────────────
@@ -171,7 +185,14 @@ export default function LoginPage() {
 
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gold rounded-xl flex items-center justify-center text-white font-bold text-lg">▦</div>
+            <svg width="36" height="36" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <mask id="login-mark" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+                <rect x="4" y="4" width="56" height="56" rx="15" fill="white" />
+                <path d="M 46 22 C 14 22 14 32 32 32 C 50 32 50 42 18 42"
+                  stroke="black" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </mask>
+              <rect x="4" y="4" width="56" height="56" rx="15" fill="#C9A56B" mask="url(#login-mark)" />
+            </svg>
             <div>
               <div className="text-white text-xl font-bold tracking-wide">Sevenhood</div>
               <div className="text-white/40 text-xs tracking-[0.25em] uppercase">Operator Console</div>
@@ -209,7 +230,14 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
 
           <div className="flex lg:hidden items-center gap-2 mb-8">
-            <div className="w-8 h-8 bg-forest rounded-lg flex items-center justify-center text-white font-bold text-sm">▦</div>
+            <svg width="32" height="32" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <mask id="login-mark-sm" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+                <rect x="4" y="4" width="56" height="56" rx="15" fill="white" />
+                <path d="M 46 22 C 14 22 14 32 32 32 C 50 32 50 42 18 42"
+                  stroke="black" strokeWidth="5.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </mask>
+              <rect x="4" y="4" width="56" height="56" rx="15" fill="#C9A56B" mask="url(#login-mark-sm)" />
+            </svg>
             <span className="font-bold text-ink">Sevenhood</span>
           </div>
 

@@ -82,6 +82,29 @@ export default function TicketsPage() {
   const [providers, setProviders]   = useState<Pick<ServiceProvider, 'id' | 'name'>[]>([])
   const [loading, setLoading]       = useState(true)
   const [filters, setFilters]       = useState<Filters>(EMPTY_FILTERS)
+
+  // AI Insights state
+  const [aiInsights, setAIInsights]     = useState<null | {
+    summary: string
+    risk_units: { unit: string; project: string; count: number; main_issue: string; recommendation: string }[]
+    top_issues: { category: string; count: number; trend: string; action: string }[]
+    recommendations: string[]
+    urgency_level: string
+    total_analyzed: number
+  }>(null)
+  const [aiLoading, setAILoading]       = useState(false)
+  const [showInsights, setShowInsights] = useState(false)
+
+  async function loadInsights() {
+    setAILoading(true)
+    setShowInsights(true)
+    try {
+      const res = await fetch('/api/ai/maintenance-insights', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && !data.error) setAIInsights(data)
+    } catch { /* silent */ }
+    setAILoading(false)
+  }
   const [showAddModal, setShowAddModal]   = useState(false)
   const [editingTicket, setEditingTicket] = useState<TicketRow | null>(null)
   const [saving, setSaving]         = useState(false)
@@ -246,13 +269,108 @@ export default function TicketsPage() {
             {tickets.length} total
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-forest text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-deep transition-colors"
-        >
-          + New Ticket
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={loadInsights}
+            disabled={aiLoading}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50"
+          >
+            {aiLoading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analyzing...</> : '🔮 AI Insights'}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-forest text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-deep transition-colors"
+          >
+            + New Ticket
+          </button>
+        </div>
       </div>
+
+      {/* AI Insights Panel */}
+      {showInsights && (
+        <div className="mb-6">
+          {aiLoading && (
+            <div className="bg-white rounded-2xl border border-border p-6 shadow-sm text-center">
+              <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-sm text-slate">Analyzing 6 months of maintenance data...</p>
+            </div>
+          )}
+          {!aiLoading && aiInsights && (
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border border-purple-200 p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-purple-900 flex items-center gap-2">
+                    🔮 AI Maintenance Insights
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      aiInsights.urgency_level === 'high' ? 'bg-red-100 text-red-700' :
+                      aiInsights.urgency_level === 'medium' ? 'bg-orange-100 text-orange-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {aiInsights.urgency_level?.toUpperCase()} PRIORITY
+                    </span>
+                  </h3>
+                  <p className="text-sm text-purple-700 mt-1">{aiInsights.summary}</p>
+                  <p className="text-xs text-purple-500 mt-0.5">Based on {aiInsights.total_analyzed} tickets (last 6 months)</p>
+                </div>
+                <button onClick={() => setShowInsights(false)} className="text-purple-400 hover:text-purple-700 text-sm ml-4 shrink-0">✕</button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                {/* Risk Units */}
+                {aiInsights.risk_units?.length > 0 && (
+                  <div className="bg-white/60 rounded-xl p-4">
+                    <h4 className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">⚠️ Units at Risk</h4>
+                    <div className="space-y-2">
+                      {aiInsights.risk_units.slice(0, 4).map((u, i) => (
+                        <div key={i} className="text-xs">
+                          <div className="font-semibold text-ink">Unit {u.unit} · {u.project}</div>
+                          <div className="text-slate">{u.count} tickets · {u.main_issue}</div>
+                          <div className="text-purple-600 mt-0.5">{u.recommendation}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Issues */}
+                {aiInsights.top_issues?.length > 0 && (
+                  <div className="bg-white/60 rounded-xl p-4">
+                    <h4 className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">📊 Top Issues</h4>
+                    <div className="space-y-2">
+                      {aiInsights.top_issues.slice(0, 4).map((issue, i) => (
+                        <div key={i} className="text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-ink capitalize">{issue.category}</span>
+                            <span className="text-slate">{issue.count}x</span>
+                          </div>
+                          <div className={`text-xs mt-0.5 ${issue.trend === 'increasing' ? 'text-red-600' : 'text-green-600'}`}>
+                            {issue.trend === 'increasing' ? '↑' : '↓'} {issue.trend}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {aiInsights.recommendations?.length > 0 && (
+                  <div className="bg-white/60 rounded-xl p-4">
+                    <h4 className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">✅ Recommendations</h4>
+                    <div className="space-y-2">
+                      {aiInsights.recommendations.slice(0, 3).map((r, i) => (
+                        <div key={i} className="flex gap-1.5 text-xs text-ink">
+                          <span className="text-purple-500 shrink-0 mt-0.5">•</span>
+                          {r}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-border p-4 mb-5 flex flex-wrap gap-3">

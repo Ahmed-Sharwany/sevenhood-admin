@@ -24,15 +24,17 @@ export default function AuthCallback() {
         return
       }
 
-      // Fetch the operator account record
+      // Fetch the full account record (same fields as OTP login)
       const { data: account } = await supabase
         .from('accounts')
-        .select('id, full_name, email, role, company_name')
+        .select('id, full_name, email, role, company_name, permissions, project_access')
         .eq('email', session.user.email ?? '')
         .maybeSingle()
 
       if (account) {
-        localStorage.setItem('sevenhood_user', JSON.stringify(account))
+        // Ensure permissions is always an array
+        const stored = { ...account, permissions: account.permissions ?? [] }
+        localStorage.setItem('sevenhood_user', JSON.stringify(stored))
       }
 
       // Set session cookie for middleware

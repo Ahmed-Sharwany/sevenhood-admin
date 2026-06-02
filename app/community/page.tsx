@@ -36,6 +36,12 @@ export default function CommunityPage() {
   const [savingEvent, setSavingEvent] = useState(false)
   const [showEventModal, setShowEventModal] = useState(false)
 
+  // AI Announcement Generator state
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiForm, setAIForm] = useState({ type: 'maintenance', details: '', tone: 'formal' })
+  const [aiGenerating, setAIGenerating] = useState(false)
+  const [aiError, setAIError] = useState('')
+
   async function load() {
     setLoading(true)
     const [p, e, pr] = await Promise.all([
@@ -50,6 +56,40 @@ export default function CommunityPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function handleGenerateAI(e: React.FormEvent) {
+    e.preventDefault()
+    setAIGenerating(true)
+    setAIError('')
+    try {
+      const res = await fetch('/api/ai/announcement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: aiForm.type,
+          details: aiForm.details,
+          tone: aiForm.tone,
+          project_name: projects[0]?.name,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setAIError(data.error ?? 'Failed to generate announcement.')
+      } else {
+        // Fill the announcement form with generated content
+        setAnnouncementForm(f => ({
+          ...f,
+          title: data.title_en,
+          content: `${data.body_en}\n\n---\n\n${data.title_ar}\n\n${data.body_ar}`,
+        }))
+        setShowAIModal(false)
+        setAIForm({ type: 'maintenance', details: '', tone: 'formal' })
+      }
+    } catch {
+      setAIError('Network error. Please try again.')
+    }
+    setAIGenerating(false)
+  }
 
   async function handlePostAnnouncement(e: React.FormEvent) {
     e.preventDefault()
@@ -168,10 +208,19 @@ export default function CommunityPage() {
         <div className="space-y-6">
           {/* Post Announcement Form */}
           <div className="bg-white rounded-2xl border border-border p-6 shadow-sm">
-            <h3 className="font-semibold text-ink mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-forest inline-block"></span>
-              Post New Announcement
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-ink flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-forest inline-block"></span>
+                Post New Announcement
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAIModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-xs font-semibold hover:from-purple-600 hover:to-indigo-600 transition-all shadow-sm"
+              >
+                ✨ Generate with AI
+              </button>
+            </div>
             <form onSubmit={handlePostAnnouncement} className="space-y-3">
               <input
                 required
@@ -443,6 +492,98 @@ export default function CommunityPage() {
                   className="flex-1 bg-forest text-white rounded-xl py-2 text-sm font-medium disabled:opacity-50 hover:bg-deep transition-colors"
                 >
                   {savingEvent ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Announcement Generator Modal ─────────────────────────────────── */}
+      {showAIModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">✨</span>
+                <h2 className="font-semibold text-ink">AI Announcement Generator</h2>
+              </div>
+              <button
+                onClick={() => { setShowAIModal(false); setAIError('') }}
+                className="text-slate hover:text-ink text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleGenerateAI} className="p-6 space-y-4">
+              {aiError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                  {aiError}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">
+                  Announcement Type
+                </label>
+                <select
+                  value={aiForm.type}
+                  onChange={e => setAIForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest bg-white"
+                >
+                  <option value="maintenance">🔧 Maintenance Notice</option>
+                  <option value="amenity">🏊 Amenity Update</option>
+                  <option value="security">🔒 Security Notice</option>
+                  <option value="event">🎉 Event / Activity</option>
+                  <option value="welcome">👋 Welcome Message</option>
+                  <option value="rule">📋 Community Rule Reminder</option>
+                  <option value="general">📢 General Announcement</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">
+                  Tone
+                </label>
+                <select
+                  value={aiForm.tone}
+                  onChange={e => setAIForm(f => ({ ...f, tone: e.target.value }))}
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest bg-white"
+                >
+                  <option value="formal">Formal &amp; Professional</option>
+                  <option value="friendly">Warm &amp; Friendly</option>
+                  <option value="urgent">Urgent &amp; Important</option>
+                  <option value="reminder">Gentle Reminder</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">
+                  Brief Details
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="e.g. The swimming pool will be closed for maintenance from Monday Jan 6 to Wednesday Jan 8. We apologize for the inconvenience."
+                  value={aiForm.details}
+                  onChange={e => setAIForm(f => ({ ...f, details: e.target.value }))}
+                  className="w-full border border-border rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-forest resize-none"
+                />
+                <p className="text-xs text-fog mt-1">Write in English or Arabic — AI will generate a bilingual announcement.</p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowAIModal(false); setAIError('') }}
+                  className="flex-1 border border-border rounded-xl py-2.5 text-sm hover:bg-cream transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={aiGenerating || !aiForm.details.trim()}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50 hover:from-purple-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2"
+                >
+                  {aiGenerating ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating...</>
+                  ) : '✨ Generate Bilingual'}
                 </button>
               </div>
             </form>

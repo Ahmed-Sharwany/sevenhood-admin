@@ -3,37 +3,53 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Account, AccountRole } from '@/lib/types'
+import { ALL_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/lib/permissions'
 
-const ROLE_OPTIONS: AccountRole[] = ['super_admin', 'project_owner', 'service_provider']
+const ROLE_OPTIONS: AccountRole[] = [
+  'super_admin', 'org_admin', 'project_owner',
+  'operator', 'finance', 'service_provider', 'technician',
+]
 
 const ROLE_LABELS: Record<AccountRole, string> = {
   super_admin:      'Super Admin',
+  org_admin:        'Org Admin',
   project_owner:    'Project Owner',
+  operator:         'Operator',
+  finance:          'Finance',
   service_provider: 'Service Provider',
+  technician:       'Technician',
 }
 
 const ROLE_BADGE: Record<AccountRole, string> = {
   super_admin:      'bg-forest text-white',
+  org_admin:        'bg-deep text-white',
   project_owner:    'bg-gold text-white',
+  operator:         'bg-amber-600 text-white',
+  finance:          'bg-emerald-600 text-white',
   service_provider: 'bg-blue-600 text-white',
+  technician:       'bg-slate-500 text-white',
 }
 
 interface FormState {
-  full_name: string
-  email: string
-  role: AccountRole
-  company_name: string
-  phone: string
-  is_active: boolean
+  full_name:        string
+  email:            string
+  role:             AccountRole
+  company_name:     string
+  phone:            string
+  is_active:        boolean
+  permissions:      string[]
+  unit_monthly_fee: string   // custom billing rate per unit (empty = use global)
 }
 
 const EMPTY_FORM: FormState = {
-  full_name: '',
-  email: '',
-  role: 'project_owner',
-  company_name: '',
-  phone: '',
-  is_active: true,
+  full_name:        '',
+  email:            '',
+  role:             'project_owner',
+  company_name:     '',
+  phone:            '',
+  is_active:        true,
+  permissions:      ROLE_DEFAULT_PERMISSIONS['project_owner'],
+  unit_monthly_fee: '',
 }
 
 function Avatar({ name }: { name: string }) {
@@ -85,12 +101,14 @@ export default function AccountsPage() {
   function openEdit(a: Account) {
     setEditingAccount(a)
     setForm({
-      full_name: a.full_name,
-      email: a.email,
-      role: a.role,
-      company_name: a.company_name ?? '',
-      phone: a.phone ?? '',
-      is_active: a.is_active,
+      full_name:        a.full_name,
+      email:            a.email,
+      role:             a.role,
+      company_name:     a.company_name ?? '',
+      phone:            a.phone ?? '',
+      is_active:        a.is_active,
+      permissions:      a.permissions ?? ROLE_DEFAULT_PERMISSIONS[a.role] ?? [],
+      unit_monthly_fee: a.unit_monthly_fee != null ? String(a.unit_monthly_fee) : '',
     })
     setShowModal(true)
   }
@@ -99,12 +117,14 @@ export default function AccountsPage() {
     e.preventDefault()
     setSaving(true)
     const payload = {
-      full_name: form.full_name,
-      email: form.email,
-      role: form.role,
-      company_name: form.company_name || null,
-      phone: form.phone || null,
-      is_active: form.is_active,
+      full_name:        form.full_name,
+      email:            form.email,
+      role:             form.role,
+      company_name:     form.company_name || null,
+      phone:            form.phone || null,
+      is_active:        form.is_active,
+      permissions:      form.permissions,
+      unit_monthly_fee: form.unit_monthly_fee !== '' ? parseFloat(form.unit_monthly_fee) : null,
     }
     if (editingAccount) {
       await supabase.from('accounts').update(payload).eq('id', editingAccount.id)
@@ -127,10 +147,11 @@ export default function AccountsPage() {
     : accounts
 
   // Stats
-  const totalAccounts     = accounts.length
-  const superAdmins       = accounts.filter(a => a.role === 'super_admin').length
-  const projectOwners     = accounts.filter(a => a.role === 'project_owner').length
-  const serviceProviders  = accounts.filter(a => a.role === 'service_provider').length
+  const totalAccounts    = accounts.length
+  const adminCount       = accounts.filter(a => ['super_admin', 'org_admin'].includes(a.role)).length
+  const projectOwners    = accounts.filter(a => a.role === 'project_owner').length
+  const operationsCount  = accounts.filter(a => ['operator', 'finance', 'technician'].includes(a.role)).length
+  const serviceProviders = accounts.filter(a => a.role === 'service_provider').length
 
   return (
     <div className="p-8">
@@ -157,21 +178,26 @@ export default function AccountsPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
         <div className="bg-forest text-white rounded-2xl p-5 border border-border shadow-sm">
           <div className="text-3xl font-bold mb-1">{totalAccounts}</div>
           <div className="font-semibold text-sm">Total Accounts</div>
           <div className="text-xs opacity-70 mt-1">all platform users</div>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <div className="text-3xl font-bold text-ink mb-1">{superAdmins}</div>
-          <div className="font-semibold text-sm text-ink">Super Admins</div>
-          <div className="text-xs text-slate mt-1">full access</div>
+          <div className="text-3xl font-bold text-ink mb-1">{adminCount}</div>
+          <div className="font-semibold text-sm text-ink">Admins</div>
+          <div className="text-xs text-slate mt-1">super & org admin</div>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
           <div className="text-3xl font-bold text-ink mb-1">{projectOwners}</div>
           <div className="font-semibold text-sm text-ink">Project Owners</div>
           <div className="text-xs text-slate mt-1">project-level access</div>
+        </div>
+        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <div className="text-3xl font-bold text-ink mb-1">{operationsCount}</div>
+          <div className="font-semibold text-sm text-ink">Operations</div>
+          <div className="text-xs text-slate mt-1">operator, finance, tech</div>
         </div>
         <div className="bg-gold text-white rounded-2xl p-5 border border-border shadow-sm">
           <div className="text-3xl font-bold mb-1">{serviceProviders}</div>
@@ -283,21 +309,31 @@ export default function AccountsPage() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="px-7 py-5 border-b border-border flex items-center justify-between">
-              <h2 className="font-bold text-lg text-ink">
-                {editingAccount ? 'Edit Account' : 'Add Account'}
-              </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 48px)' }}>
+
+            {/* ── Fixed Header ─────────────────────────────────────────────── */}
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="font-bold text-base text-ink">
+                  {editingAccount ? 'Edit Account' : 'Add Account'}
+                </h2>
+                <p className="text-xs text-slate mt-0.5">
+                  {editingAccount ? 'Update account details and permissions' : 'Create a new platform account'}
+                </p>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate hover:text-ink text-xl leading-none"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate hover:text-ink hover:bg-cream transition-colors text-lg"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="px-7 py-5 space-y-4">
+            {/* ── Scrollable Body ───────────────────────────────────────────── */}
+            <form onSubmit={handleSave} className="flex flex-col min-h-0 flex-1">
+              <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
               {/* Full Name + Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -328,7 +364,15 @@ export default function AccountsPage() {
                 <label className="block text-xs font-semibold text-slate mb-1.5 uppercase tracking-wide">Role</label>
                 <select
                   value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value as AccountRole }))}
+                  onChange={e => {
+                    const newRole = e.target.value as AccountRole
+                    setForm(f => ({
+                      ...f,
+                      role: newRole,
+                      // Auto-set default permissions when role changes
+                      permissions: ROLE_DEFAULT_PERMISSIONS[newRole] ?? [],
+                    }))
+                  }}
                   className="w-full border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest bg-white"
                 >
                   {ROLE_OPTIONS.map(r => (
@@ -336,6 +380,68 @@ export default function AccountsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Permissions — shown for non-super-admin roles */}
+              {!['super_admin', 'org_admin'].includes(form.role) && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate mb-2 uppercase tracking-wide">
+                    Permissions
+                    <span className="ml-2 font-normal normal-case text-slate/70">
+                      — controls what this account can access
+                    </span>
+                  </label>
+                  <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
+                    {(() => {
+                      const groups = Array.from(new Set(ALL_PERMISSIONS.map(p => p.group)))
+                      return groups.map(group => (
+                        <div key={group}>
+                          <div className="px-3 py-1.5 bg-cream/60 text-xs font-semibold text-slate uppercase tracking-wide">
+                            {group}
+                          </div>
+                          {ALL_PERMISSIONS.filter(p => p.group === group).map(perm => (
+                            <label key={perm.id}
+                              className="flex items-center gap-3 px-4 py-2.5 hover:bg-cream/40 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={form.permissions.includes(perm.id)}
+                                onChange={e => setForm(f => ({
+                                  ...f,
+                                  permissions: e.target.checked
+                                    ? [...f.permissions, perm.id]
+                                    : f.permissions.filter(p => p !== perm.id),
+                                }))}
+                                className="w-4 h-4 rounded border-border accent-forest"
+                              />
+                              <span className="text-lg w-5 text-center flex-shrink-0">{perm.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-ink">{perm.label}</div>
+                                <div className="text-xs text-slate">{perm.desc}</div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                  <div className="mt-2 flex gap-3">
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, permissions: ALL_PERMISSIONS.map(p => p.id) }))}
+                      className="text-xs text-forest hover:underline">
+                      Select all
+                    </button>
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, permissions: [] }))}
+                      className="text-xs text-slate hover:underline">
+                      Clear all
+                    </button>
+                    <button type="button"
+                      onClick={() => setForm(f => ({ ...f, permissions: ROLE_DEFAULT_PERMISSIONS[f.role] ?? [] }))}
+                      className="text-xs text-slate hover:underline">
+                      Reset to defaults
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Company + Phone */}
               <div className="grid grid-cols-2 gap-4">
@@ -359,6 +465,30 @@ export default function AccountsPage() {
                 </div>
               </div>
 
+              {/* Custom Billing Rate — only for subscription-billed roles */}
+              {['project_owner', 'operator', 'org_admin'].includes(form.role) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <label className="block text-xs font-semibold text-amber-800 mb-1.5 uppercase tracking-wide">
+                    💰 Custom Unit Subscription Fee (SAR)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Leave empty to use global rate"
+                      value={form.unit_monthly_fee}
+                      onChange={e => setForm(f => ({ ...f, unit_monthly_fee: e.target.value }))}
+                      className="flex-1 border border-amber-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500 bg-white"
+                    />
+                    <span className="text-sm text-amber-700 font-medium whitespace-nowrap">SAR / unit / month</span>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Overrides the global rate for this account only. Leave empty to use the platform default.
+                  </p>
+                </div>
+              )}
+
               {/* Active Toggle */}
               <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3">
                 <div>
@@ -380,22 +510,29 @@ export default function AccountsPage() {
                 </button>
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 border border-border rounded-xl py-2.5 text-sm font-medium text-slate hover:bg-cream transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 bg-forest text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-deep transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Saving…' : editingAccount ? 'Save Changes' : 'Add Account'}
-                </button>
+              </div>{/* end scrollable body */}
+
+              {/* ── Sticky Footer ────────────────────────────────────────────── */}
+              <div className="px-6 py-4 border-t border-border bg-white rounded-b-2xl shrink-0">
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 border border-border rounded-xl py-2.5 text-sm font-medium text-slate hover:bg-cream transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-2 bg-forest text-white rounded-xl py-2.5 px-8 text-sm font-semibold hover:bg-deep transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {saving && (
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    )}
+                    {saving ? 'Saving…' : editingAccount ? 'Save Changes' : 'Add Account'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

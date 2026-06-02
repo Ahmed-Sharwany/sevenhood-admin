@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Resident, Unit, Building, Project } from '@/lib/types'
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
 const ROLE_STYLES: Record<string, string> = {
   owner:  'bg-forest text-white',
   tenant: 'bg-gold text-white',
@@ -170,9 +173,59 @@ export default function ResidentsPage() {
     ? buildings.filter(b => b.project_id === filterProject)
     : buildings
 
-  const totalOwners = residents.filter(r => r.role === 'owner').length
+  const totalOwners  = residents.filter(r => r.role === 'owner').length
   const totalTenants = residents.filter(r => r.role === 'tenant').length
-  const totalFamily = residents.filter(r => r.role === 'family').length
+  const totalFamily  = residents.filter(r => r.role === 'family').length
+
+  // ── Invitation state ──────────────────────────────────────────────────────
+  const [inviteResident, setInviteResident] = useState<ResidentRow | null>(null)
+  const [inviteSending,  setInviteSending]  = useState(false)
+  const [inviteResult,   setInviteResult]   = useState<{ activation_code?: string; message?: string; error?: string } | null>(null)
+
+  // Determine if current user can invite
+  const canInvite = (() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('sevenhood_user') ?? '{}')
+      const adminRoles = ['super_admin', 'org_admin', 'project_owner']
+      return adminRoles.includes(u.role) || (u.permissions ?? []).includes('invite_residents')
+    } catch { return false }
+  })()
+
+  async function handleSendInvitation(resident: ResidentRow) {
+    setInviteResident(resident)
+    setInviteResult(null)
+    setInviteSending(true)
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON}`,
+        },
+        body: JSON.stringify({
+          resident_id: resident.id,
+          language: 'en',
+          invited_by: null,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        setInviteResult({ error: data.error ?? 'Failed to generate invitation.' })
+      } else {
+        setInviteResult({
+          activation_code: data.activation_code,
+          message: `Invitation created! Activation code: ${data.activation_code}`,
+        })
+      }
+    } catch {
+      setInviteResult({ error: 'Network error. Please try again.' })
+    } finally {
+      setInviteSending(false)
+    }
+  }
 
   return (
     <div className="p-8">
@@ -252,12 +305,13 @@ export default function ResidentsPage() {
               <th className="px-6 py-3 text-left">Email</th>
               <th className="px-6 py-3 text-left">Phone</th>
               <th className="px-6 py-3 text-left">Move-in</th>
+              <th className="px-6 py-3 text-left">App</th>
               <th className="px-6 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="px-6 py-10 text-center text-slate">Loading...</td></tr>
+              <tr><td colSpan={9} className="px-6 py-10 text-center text-slate">Loading...</td></tr>
             )}
             {!loading && filtered.map(r => (
               <tr key={r.id} className="border-b border-border last:border-0 hover:bg-cream/40 transition-colors">
@@ -284,6 +338,17 @@ export default function ResidentsPage() {
                     : '—'}
                 </td>
                 <td className="px-6 py-3">
+                  {canInvite && (
+                    <button
+                      onClick={() => handleSendInvitation(r)}
+                      title="Send App Invitation"
+                      className="text-xs font-medium px-2.5 py-1 rounded-lg border border-gold text-gold hover:bg-gold hover:text-white transition-colors"
+                    >
+                      📲 Invite
+                    </button>
+                  )}
+                </td>
+                <td className="px-6 py-3">
                   <div className="flex gap-3">
                     <button
                       onClick={() => openEdit(r)}
@@ -303,7 +368,7 @@ export default function ResidentsPage() {
             ))}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-10 text-center text-slate">
+                <td colSpan={9} className="px-6 py-10 text-center text-slate">
                   {residents.length === 0 ? 'No residents yet.' : 'No residents match the filters.'}
                 </td>
               </tr>
@@ -311,6 +376,88 @@ export default function ResidentsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ── Invitation Result Modal ──────────────────────────────────────────── */}
+      {inviteResident && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-ink text-base">App Invitation</h3>
+              <button onClick={() => { setInviteResident(null); setInviteResult(null) }}
+                className="text-slate hover:text-ink text-xl leading-none">×</button>
+            </div>
+
+            <div className="flex items-center gap-3 mb-4 p-3 bg-cream rounded-xl border border-border">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-xs shrink-0 ${getAvatarColor(inviteResident.full_name)}`}>
+                {getInitials(inviteResident.full_name)}
+              </div>
+              <div>
+                <div className="font-semibold text-ink text-sm">{inviteResident.full_name}</div>
+                <div className="text-xs text-slate">
+                  {inviteResident.units?.unit_number
+                    ? `Unit ${inviteResident.units.unit_number} · ${inviteResident.units.buildings?.name ?? ''}`
+                    : 'No unit assigned'}
+                </div>
+              </div>
+            </div>
+
+            {inviteSending && (
+              <div className="flex items-center gap-3 py-4 text-slate text-sm">
+                <div className="w-5 h-5 border-2 border-forest border-t-transparent rounded-full animate-spin shrink-0" />
+                Generating invitation…
+              </div>
+            )}
+
+            {!inviteSending && !inviteResult && (
+              <div className="text-sm text-slate mb-4">
+                This will generate an activation code and send an SMS invitation to the resident&apos;s phone.
+              </div>
+            )}
+
+            {inviteResult?.error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-4">
+                ⚠️ {inviteResult.error}
+              </div>
+            )}
+
+            {inviteResult?.activation_code && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-4 mb-4">
+                <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
+                  ✓ Invitation Created
+                </div>
+                <div className="text-slate text-xs mb-3">
+                  Share this activation code with the resident to join the Sevenhood app:
+                </div>
+                <div className="bg-white border border-green-200 rounded-lg px-4 py-3 text-center">
+                  <div className="font-mono text-2xl font-bold text-ink tracking-[0.2em]">
+                    {inviteResult.activation_code}
+                  </div>
+                </div>
+                <div className="text-xs text-slate mt-2 text-center">
+                  Valid for 7 days · Resident enters this in the app
+                </div>
+              </div>
+            )}
+
+            {!inviteSending && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setInviteResident(null); setInviteResult(null) }}
+                  className="flex-1 border border-border rounded-xl py-2.5 text-sm text-slate hover:bg-cream transition-colors">
+                  {inviteResult?.activation_code ? 'Done' : 'Cancel'}
+                </button>
+                {!inviteResult?.activation_code && (
+                  <button
+                    onClick={() => handleSendInvitation(inviteResident)}
+                    className="flex-1 bg-gold text-white rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity">
+                    📲 Send Invitation
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (

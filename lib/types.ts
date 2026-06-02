@@ -5,7 +5,7 @@ export type TicketStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
 export type Priority = 'low' | 'medium' | 'high'
 export type PassStatus = 'active' | 'pending' | 'expired' | 'cancelled'
 export type PaymentStatus = 'paid' | 'upcoming' | 'overdue'
-export type AccountRole = 'super_admin' | 'project_owner' | 'service_provider'
+export type AccountRole = 'super_admin' | 'org_admin' | 'project_owner' | 'operator' | 'finance' | 'service_provider' | 'technician'
 export type ProjectStatus = 'active' | 'inactive' | 'pending'
 export type AIDesignStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
@@ -24,6 +24,9 @@ export interface Account {
   company_name: string | null
   phone: string | null
   is_active: boolean
+  permissions: string[]
+  project_access: string[] | null
+  unit_monthly_fee: number | null   // custom billing rate; null = use global
   created_at: string
 }
 

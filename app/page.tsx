@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import AIQueryBar from '@/components/AIQueryBar'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -207,6 +208,9 @@ export default async function DashboardPage() {
           <div className="text-xs text-slate mt-0.5">Live platform data</div>
         </div>
       </div>
+
+      {/* ── AI Query Bar ── */}
+      <AIQueryBar />
 
       {/* ── Row 1: 4 primary cards ── */}
       <div className="grid grid-cols-4 gap-4">

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/billing/auto-generate",
+      "schedule": "0 5 28 * *"
+    },
+    {
+      "path": "/api/billing/check-overdue",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
