@@ -1,8 +1,22 @@
 {
-  "/page": "app/page.js",
-  "/residents/page": "app/residents/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/auth/callback/page": "app/auth/callback/page.js",
+  "/bookings/page": "app/bookings/page.js",
+  "/ai-design/page": "app/ai-design/page.js",
+  "/community/page": "app/community/page.js",
+  "/amenities/page": "app/amenities/page.js",
+  "/accounts/page": "app/accounts/page.js",
   "/maintenance/page": "app/maintenance/page.js",
+  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
+  "/login/page": "app/login/page.js",
+  "/providers/page": "app/providers/page.js",
   "/units/page": "app/units/page.js",
+  "/tickets/page": "app/tickets/page.js",
+  "/buildings/page": "app/buildings/page.js",
+  "/residents/page": "app/residents/page.js",
   "/visitors/page": "app/visitors/page.js",
-  "/community/page": "app/community/page.js"
+  "/projects/page": "app/projects/page.js",
+  "/page": "app/page.js",
+  "/icon/route": "app/icon/route.js",
+  "/apple-icon/route": "app/apple-icon/route.js"
 }

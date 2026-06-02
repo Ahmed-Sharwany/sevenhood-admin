@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST='{"app/projects/page.tsx -> @/components/MapPicker":{"id":9438,"files":["static/chunks/438.66b99aa84e505798.js"]},"components/MapPicker.tsx -> leaflet":{"id":7691,"files":["static/chunks/d0deef33.afff9b3bf7059c8b.js"]}}';
