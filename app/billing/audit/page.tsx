@@ -103,7 +103,7 @@ export default function BillingAuditPage() {
   const visible = entries.filter(e => {
     if (!search) return true
     const q = search.toLowerCase()
-    const inv = e.invoices?.invoice_number?.toLowerCase() ?? ''
+    const inv = e.invoices?.[0]?.invoice_number?.toLowerCase() ?? ''
     const det = JSON.stringify(e.details).toLowerCase()
     return inv.includes(q) || det.includes(q)
   })
