@@ -116,7 +116,7 @@ export default function ReportsPage() {
   // ── KPIs ──────────────────────────────────────────────────────────────────
 
   const totalCollected  = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + parseFloat(String(i.total)), 0)
-  const totalOutstanding = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + parseFloat(String(i.total)), 0)
+  const totalOutstanding = invoices.filter(i => i.status === 'pending' || i.status === 'overdue').reduce((s, i) => s + parseFloat(String(i.total)), 0)
   const subTotal = invoices.filter(i => i.invoice_type === 'subscription').reduce((s, i) => s + parseFloat(String(i.total)), 0)
   const comTotal = invoices.filter(i => i.invoice_type === 'commission').reduce((s, i) => s + parseFloat(String(i.total)), 0)
   const overdueCount = invoices.filter(i => i.status === 'overdue').length

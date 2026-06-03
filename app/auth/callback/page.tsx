@@ -27,11 +27,17 @@ export default function AuthCallback() {
       // Fetch the full account record (same fields as OTP login)
       const { data: account } = await supabase
         .from('accounts')
-        .select('id, full_name, email, role, company_name, permissions, project_access')
+        .select('id, full_name, email, role, company_name, permissions, project_access, is_active')
         .eq('email', session.user.email ?? '')
         .maybeSingle()
 
       if (account) {
+        // Reject deactivated accounts
+        if (account.is_active === false) {
+          await supabase.auth.signOut()
+          setError('Your account has been deactivated. Please contact your administrator.')
+          return
+        }
         // Ensure permissions is always an array
         const stored = { ...account, permissions: account.permissions ?? [] }
         localStorage.setItem('sevenhood_user', JSON.stringify(stored))
