@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sar(amount: number) {
@@ -116,8 +124,7 @@ function buildReminderEmail(params: {
 
 // ── Audit helper ──────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function auditLog(db: any, event_type: string, invoice_id: string, details: Record<string, unknown>) {
+async function auditLog(db: ReturnType<typeof adminClient>, event_type: string, invoice_id: string, details: Record<string, unknown>) {
   try {
     await db.from('billing_audit_log').insert({ event_type, invoice_id, details })
   } catch (err) {
@@ -134,11 +141,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const db = adminClient()
 
   const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'https://admin.sevenhood.app'
   const resendKey  = process.env.RESEND_API_KEY
@@ -227,6 +230,12 @@ export async function GET(req: NextRequest) {
       const name  = (inv.accounts as any)?.full_name ?? (inv.service_providers as any)?.name ?? 'Valued Partner'
       const email = (inv.accounts as any)?.email ?? (inv.service_providers as any)?.contact_email
 
+      // ── Update DB FIRST — prevents duplicate emails if email step fails
+      await db.from('invoices').update({
+        reminder_count:   level,
+        last_reminder_at: now,
+      }).eq('id', inv.id)
+
       if (email && resendKey) {
         const cfg = REMINDER_CONFIG[level]
         await fetch('https://api.resend.com/emails', {
@@ -248,11 +257,6 @@ export async function GET(req: NextRequest) {
           }),
         })
       }
-
-      await db.from('invoices').update({
-        reminder_count:   level,
-        last_reminder_at: now,
-      }).eq('id', inv.id)
 
       await auditLog(db, 'overdue_reminder', inv.id, {
         reminder_level: level,

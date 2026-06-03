@@ -35,7 +35,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   org_admin:        ALL_PERMISSIONS.map(p => p.id),
   project_owner:    ALL_PERMISSIONS.map(p => p.id),
   operator:         ['invite_residents', 'manage_bookings', 'manage_tickets', 'manage_visitors'],
-  finance:          [],
+  finance:          ['manage_billing'],
   service_provider: ['manage_tickets'],
   technician:       ['manage_tickets'],
 }
@@ -49,6 +49,7 @@ export const HREF_PERMISSION: Record<string, string> = {
   '/residents':  'manage_residents',
   '/bookings':   'manage_bookings',
   '/tickets':    'manage_tickets',
+  '/maintenance':          'manage_tickets',
   '/visitors':   'manage_visitors',
   '/providers':  'manage_providers',
   '/community':  'manage_community',
@@ -57,5 +58,7 @@ export const HREF_PERMISSION: Record<string, string> = {
   '/chatbot':              'use_ai_chatbot',
   '/billing':              'manage_billing',
   '/billing/invoices':     'manage_billing',
+  '/billing/reports':      'manage_billing',
+  '/billing/audit':        'manage_billing',
   '/billing/settings':     'manage_billing',
 }

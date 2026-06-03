@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Account, AccountRole } from '@/lib/types'
+import type { Account, AccountRole, Project } from '@/lib/types'
 import { ALL_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/lib/permissions'
 
 const ROLE_OPTIONS: AccountRole[] = [
@@ -38,7 +38,8 @@ interface FormState {
   phone:            string
   is_active:        boolean
   permissions:      string[]
-  unit_monthly_fee: string   // custom billing rate per unit (empty = use global)
+  project_access:   string[]  // project IDs this account can bill/manage
+  unit_monthly_fee: string    // custom billing rate per unit (empty = use global)
 }
 
 const EMPTY_FORM: FormState = {
@@ -49,6 +50,7 @@ const EMPTY_FORM: FormState = {
   phone:            '',
   is_active:        true,
   permissions:      ROLE_DEFAULT_PERMISSIONS['project_owner'],
+  project_access:   [],
   unit_monthly_fee: '',
 }
 
@@ -76,6 +78,7 @@ function Avatar({ name }: { name: string }) {
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
@@ -85,8 +88,12 @@ export default function AccountsPage() {
 
   async function loadAccounts() {
     setLoading(true)
-    const { data } = await supabase.from('accounts').select('*').order('created_at', { ascending: false })
-    setAccounts((data as Account[]) ?? [])
+    const [{ data: accs }, { data: projs }] = await Promise.all([
+      supabase.from('accounts').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name').order('name'),
+    ])
+    setAccounts((accs as Account[]) ?? [])
+    setProjects((projs as Project[]) ?? [])
     setLoading(false)
   }
 
@@ -108,6 +115,7 @@ export default function AccountsPage() {
       phone:            a.phone ?? '',
       is_active:        a.is_active,
       permissions:      a.permissions ?? ROLE_DEFAULT_PERMISSIONS[a.role] ?? [],
+      project_access:   a.project_access ?? [],
       unit_monthly_fee: a.unit_monthly_fee != null ? String(a.unit_monthly_fee) : '',
     })
     setShowModal(true)
@@ -124,6 +132,7 @@ export default function AccountsPage() {
       phone:            form.phone || null,
       is_active:        form.is_active,
       permissions:      form.permissions,
+      project_access:   form.project_access.length > 0 ? form.project_access : null,
       unit_monthly_fee: form.unit_monthly_fee !== '' ? parseFloat(form.unit_monthly_fee) : null,
     }
     if (editingAccount) {
@@ -464,6 +473,41 @@ export default function AccountsPage() {
                   />
                 </div>
               </div>
+
+              {/* Project Access — controls which projects are billed to this account */}
+              {['project_owner', 'operator', 'org_admin'].includes(form.role) && projects.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <label className="block text-xs font-semibold text-blue-800 mb-2 uppercase tracking-wide">
+                    🏗️ Project Access
+                    <span className="ml-2 font-normal normal-case text-blue-600/80">
+                      — determines which projects are billed to this account
+                    </span>
+                  </label>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {projects.map(p => (
+                      <label key={p.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-blue-100/50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.project_access.includes(p.id)}
+                          onChange={e => setForm(f => ({
+                            ...f,
+                            project_access: e.target.checked
+                              ? [...f.project_access, p.id]
+                              : f.project_access.filter(id => id !== p.id),
+                          }))}
+                          className="w-4 h-4 rounded border-blue-300 accent-blue-600"
+                        />
+                        <span className="text-sm text-ink font-medium">{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {form.project_access.length === 0 && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      ⚠️ No projects selected — subscription invoices won&apos;t be generated for this account.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Custom Billing Rate — only for subscription-billed roles */}
               {['project_owner', 'operator', 'org_admin'].includes(form.role) && (

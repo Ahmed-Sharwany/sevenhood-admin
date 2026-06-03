@@ -111,16 +111,13 @@ function canSeeHref(href: string, role: string, permissions: string[]): boolean 
   // Admin section — only super/org admin
   if (href === '/accounts') return FULL_ACCESS_ROLES.has(role)
 
-  // Billing section — only super/org admin
-  if (href.startsWith('/billing')) return FULL_ACCESS_ROLES.has(role)
-
   // Full access roles see everything
   if (FULL_ACCESS_ROLES.has(role)) return true
 
   // Project owner sees everything except admin
   if (role === 'project_owner') return href !== '/accounts'
 
-  // For everyone else, check the required permission
+  // For everyone else (including finance), check the required permission
   const required = HREF_PERMISSION[href]
   if (!required) return false
   return permissions.includes(required)
