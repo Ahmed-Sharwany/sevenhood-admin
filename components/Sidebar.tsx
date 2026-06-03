@@ -60,8 +60,9 @@ const NAV_GROUPS = [
     id: 'engagement',
     label: 'Engagement',
     items: [
-      { href: '/community', label: 'Community',          icon: '👥' },
-      { href: '/ai-design', label: 'AI Design',          icon: '✨' },
+      { href: '/community',      label: 'Community',          icon: '👥' },
+      { href: '/notifications',  label: 'Push Notifications', icon: '🔔' },
+      { href: '/ai-design',      label: 'AI Design',          icon: '✨' },
     ],
   },
   {
