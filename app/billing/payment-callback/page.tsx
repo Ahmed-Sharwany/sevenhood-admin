@@ -64,61 +64,15 @@ function PaymentCallbackInner() {
       return
     }
 
-    // If no status in URL, verify with Moyasar API
-    if (id) {
-      verifyPayment(id, invoiceId)
-    } else {
-      // No gateway id — just show neutral state, webhook will handle it
-      setStatus({
-        state:     'success',
-        invoiceId,
-        gatewayId: null,
-        message:   'Payment submitted. Status will be updated shortly.',
-      })
-    }
+    // No status in URL — show pending state and let the webhook handle confirmation.
+    // Never verify payments client-side (would require exposing secret key in browser).
+    setStatus({
+      state:     'success',
+      invoiceId,
+      gatewayId: id,
+      message:   'Payment submitted successfully. Your invoice will be updated within a few minutes.',
+    })
   }, [searchParams])
-
-  async function verifyPayment(gatewayId: string, invoiceId: string) {
-    try {
-      const secretKey  = process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY ?? ''
-      const credentials = btoa(`${secretKey}:`)
-
-      const res  = await fetch(`https://api.moyasar.com/v1/payments/${gatewayId}`, {
-        headers: { 'Authorization': `Basic ${credentials}` },
-      })
-      const data = await res.json()
-
-      if (data.status === 'paid') {
-        setStatus({
-          state:     'success',
-          invoiceId,
-          gatewayId,
-          message:   'Payment confirmed successfully.',
-        })
-      } else if (data.status === 'failed') {
-        setStatus({
-          state:     'failed',
-          invoiceId,
-          gatewayId,
-          message:   `Payment failed: ${data.source?.message ?? 'Unknown error'}`,
-        })
-      } else {
-        setStatus({
-          state:     'success',
-          invoiceId,
-          gatewayId,
-          message:   `Payment status: ${data.status}. Your invoice will be updated shortly.`,
-        })
-      }
-    } catch {
-      setStatus({
-        state:     'error',
-        invoiceId,
-        gatewayId,
-        message:   'Could not verify payment status. Your invoice will be updated via webhook.',
-      })
-    }
-  }
 
   return (
     <div className="p-8 flex items-start justify-center min-h-[60vh]">

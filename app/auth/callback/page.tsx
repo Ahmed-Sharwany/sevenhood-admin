@@ -43,8 +43,8 @@ export default function AuthCallback() {
         localStorage.setItem('sevenhood_user', JSON.stringify(stored))
       }
 
-      // Set session cookie for middleware
-      document.cookie = 'sb_logged_in=1; path=/; max-age=86400; SameSite=Strict'
+      // Set HttpOnly session cookie via server route (not readable by JS)
+      await fetch('/api/auth/session', { method: 'POST' })
 
       router.replace('/')
     }, 500)

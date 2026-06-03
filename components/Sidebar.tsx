@@ -145,7 +145,8 @@ export default function Sidebar() {
   async function handleLogout() {
     await supabase.auth.signOut()
     localStorage.removeItem('sevenhood_user')
-    document.cookie = 'sb_logged_in=; path=/; max-age=0; SameSite=Strict'
+    // Clear HttpOnly cookie via server route (cannot be cleared by document.cookie)
+    await fetch('/api/auth/session', { method: 'DELETE' })
     router.replace('/login')
   }
 

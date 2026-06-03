@@ -117,9 +117,9 @@ export default function LoginPage() {
         return
       }
 
-      // Store account locally and set session cookie
+      // Store account locally and set HttpOnly session cookie via server route
       localStorage.setItem('sevenhood_user', JSON.stringify(account))
-      document.cookie = 'sb_logged_in=1; path=/; max-age=86400; SameSite=Strict'
+      await fetch('/api/auth/session', { method: 'POST' })
 
       router.replace('/')
     } catch (err) {
@@ -162,10 +162,17 @@ export default function LoginPage() {
     setOtp(['', '', '', '', '', ''])
     setError('')
     setLoading(true)
-    await supabase.auth.signInWithOtp({
-      email: email.toLowerCase().trim(),
-      options: { shouldCreateUser: true },
+    // Route through the server-side endpoint — performs whitelist check
+    // before sending OTP, same as the initial send
+    const res = await fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase().trim() }),
     })
+    const data = await res.json()
+    if (!res.ok || data.error) {
+      setError(data.error ?? 'Failed to resend code. Please try again.')
+    }
     setCountdown(60)
     setLoading(false)
     setTimeout(() => inputRefs.current[0]?.focus(), 50)
